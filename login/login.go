@@ -4,15 +4,17 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"image/color"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"sort"
 	"strings"
 	"time"
 
-	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
+	"github.com/skip2/go-qrcode"
 	"github.com/tidwall/gjson"
 )
 
@@ -116,14 +118,58 @@ func mapToString(params map[string]string) string {
 	return query
 }
 
+func checkOrMakeCookieFile(cookiePath string) error {
+	// 检查文件夹是否存在
+	if _, err := os.Stat(cookiePath); os.IsNotExist(err) {
+		// 创建文件夹
+		err := os.MkdirAll(path.Dir(cookiePath), 0755)
+		if err != nil {
+			return err
+		}
+		// 创建 cookie.json 文件
+		_, err = os.Create(cookiePath)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func LoginBili(cookiePath string) (loginUrl string) {
-	//fmt.Println("请最大化窗口，以确保二维码完整显示，回车继续")
-	//fmt.Scanf("%s", "")
+
+	checkOrMakeCookieFile(cookiePath)
+
 	loginUrl, authCode := getTvQrcodeUrlAndAuthCode()
-	qrcode := qrcodeTerminal.New()
-	qrcode.Get([]byte(loginUrl)).Print()
+
 	fmt.Println("请在手机B站扫描二维码登录")
+	qr, err := qrcode.New(loginUrl, qrcode.Medium)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(qr.ToSmallString(false))
 	fmt.Println("或将此链接复制到手机B站打开:", loginUrl)
+	// 同步输出到文件
+	imagePath := path.Join(path.Dir(cookiePath), "qrcode.png")
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		// 创建文件
+		_, err := os.Create(imagePath)
+		if err != nil {
+			panic(err)
+		}
+	}
+	qr.ForegroundColor = color.RGBA{0, 0, 0, 255}       // 黑色前景
+	qr.BackgroundColor = color.RGBA{255, 255, 255, 255} // 白色背景
+
+	// 生成PNG
+	pngData, err := qr.PNG(256)
+	if err != nil {
+		panic(err)
+	}
+	err = os.WriteFile(imagePath, pngData, 0644)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("二维码已同步保存到:", imagePath)
 	defer verifyLogin(authCode, cookiePath)
 	return loginUrl
 }
