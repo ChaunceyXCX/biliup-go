@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/imroc/req/v3"
 	"github.com/panjf2000/ants/v2"
 	"github.com/schollz/progressbar/v3"
 	"github.com/tidwall/gjson"
@@ -15,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"resty.dev/v3"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,7 +34,7 @@ type Up struct {
 
 	cookie string
 	csrf   string
-	client *req.Client
+	client *resty.Client
 
 	upVideo *UpVideo
 
@@ -72,12 +72,13 @@ func NewUp(cookiePath string, threadNum int) *Up {
 			csrf = v.Value
 		}
 	}
-	var client = req.C().SetCommonHeaders(map[string]string{
+	var client = resty.New()
+	resp, _ := client.R().SetHeaders(map[string]string{
 		"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36 Edg/105.0.1343.53",
 		"cookie":     cookie,
 		"Connection": "keep-alive",
-	})
-	resp, _ := client.R().Get("https://api.bilibili.com/x/web-interface/nav")
+	}).Get("https://api.bilibili.com/x/web-interface/nav")
+
 	uname := gjson.ParseBytes(resp.Bytes()).Get("data.uname").String()
 	if uname == "" {
 		panic("cookie失效,请重新登录")
@@ -203,15 +204,14 @@ func (u *Up) Up() {
 	_ = addreq
 	resp, _ := u.client.R().SetQueryParams(map[string]string{
 		"csrf": u.csrf,
-	}).SetBodyJsonMarshal(addreq).Post("https://member.bilibili.com/x/vu/web/add/v3")
+	}).SetBody(addreq).Post("https://member.bilibili.com/x/vu/web/add/v3")
 	log.Println(resp.String())
 }
 
 func (u *Up) upload() {
 	defer ants.Release()
 	var upinfo UpInfo
-	u.client.SetCommonHeader(
-		"X-Upos-Auth", u.upVideo.auth).R().
+	u.client.SetHeader("X-Upos-Auth", u.upVideo.auth).R().
 		SetQueryParams(map[string]string{
 			"uploads":       "",
 			"output":        "json",
@@ -265,49 +265,60 @@ func (u *Up) upload() {
 	}
 	wg.Wait()
 	close(u.partChan)
-	jsonString, _ := json.Marshal(&reqjson)
-	u.client.R().SetHeaders(map[string]string{
-		"Content-Type": "application/json",
-		"Origin":       "https://member.bilibili.com",
-		"Referer":      "https://member.bilibili.com/",
-	}).SetQueryParams(map[string]string{
-		"output":   "json",
-		"profile":  "ugcfx/bup",
-		"name":     u.upVideo.videoName,
-		"uploadId": u.upVideo.uploadId,
-		"biz_id":   strconv.FormatInt(u.upVideo.bizId, 10),
-	}).SetBodyString(string(jsonString)).SetResult(&upinfo).SetRetryCount(5).AddRetryHook(func(resp *req.Response, err error) {
-		log.Println("重试发送分片确认请求")
-		return
-	}).
-		AddRetryCondition(func(resp *req.Response, err error) bool {
-			return err != nil || resp.StatusCode != 200
-		}).Post(u.upVideo.uploadBaseUrl)
+	u.client.R().
+		SetHeaders(map[string]string{
+			"Content-Type": "application/json",
+			"Origin":       "https://member.bilibili.com",
+			"Referer":      "https://member.bilibili.com/",
+		}).
+		SetQueryParams(map[string]string{
+			"output":   "json",
+			"profile":  "ugcfx/bup",
+			"name":     u.upVideo.videoName,
+			"uploadId": u.upVideo.uploadId,
+			"biz_id":   strconv.FormatInt(u.upVideo.bizId, 10),
+		}).
+		SetBody(reqjson).
+		SetResult(&upinfo).
+		SetRetryCount(5).
+		AddRetryHooks(func(resp *resty.Response, err error) {
+			log.Println("重试发送分片确认请求")
+			return
+		}).
+		AddRetryConditions(func(resp *resty.Response, err error) bool {
+			return err != nil || resp.StatusCode() != 200
+		}).
+		Post(u.upVideo.uploadBaseUrl)
 }
 
 func (u *Up) uploadPart(chunk int, start, end, size int, buf []byte, bar *progressbar.ProgressBar) {
 	defer wg.Done()
-	resp, _ := u.client.R().SetHeaders(map[string]string{
-		"Content-Type":   "application/octet-stream",
-		"Content-Length": strconv.Itoa(size),
-	}).SetQueryParams(map[string]string{
-		"partNumber": strconv.Itoa(chunk + 1),
-		"uploadId":   u.upVideo.uploadId,
-		"chunk":      strconv.Itoa(chunk),
-		"chunks":     strconv.Itoa(int(u.chunks)),
-		"size":       strconv.Itoa(size),
-		"start":      strconv.Itoa(start),
-		"end":        strconv.Itoa(end),
-		"total":      strconv.FormatInt(u.upVideo.videoSize, 10),
-	}).SetBodyBytes(buf).SetRetryCount(5).AddRetryHook(func(resp *req.Response, err error) {
-		log.Println("重试发送分片", chunk)
-		return
-	}).
-		AddRetryCondition(func(resp *req.Response, err error) bool {
-			return err != nil || resp.StatusCode != 200
-		}).Put(u.upVideo.uploadBaseUrl)
+	resp, _ := u.client.R().
+		SetHeaders(map[string]string{
+			"Content-Type":   "application/octet-stream",
+			"Content-Length": strconv.Itoa(size),
+		}).
+		SetQueryParams(map[string]string{
+			"partNumber": strconv.Itoa(chunk + 1),
+			"uploadId":   u.upVideo.uploadId,
+			"chunk":      strconv.Itoa(chunk),
+			"chunks":     strconv.Itoa(int(u.chunks)),
+			"size":       strconv.Itoa(size),
+			"start":      strconv.Itoa(start),
+			"end":        strconv.Itoa(end),
+			"total":      strconv.FormatInt(u.upVideo.videoSize, 10),
+		}).SetBody(buf).
+		SetRetryCount(5).
+		AddRetryHooks(func(resp *resty.Response, err error) {
+			log.Println("重试发送分片", chunk)
+			return
+		}).
+		AddRetryConditions(func(resp *resty.Response, err error) bool {
+			return err != nil || resp.StatusCode() != 200
+		}).
+		Put(u.upVideo.uploadBaseUrl)
 	bar.Add(len(buf) / 1024 / 1024)
-	if resp.StatusCode != 200 {
+	if resp.StatusCode() != 200 {
 		log.Println("分片", chunk, "上传失败", resp.StatusCode, "size", size)
 	}
 	u.partChan <- Part{
@@ -321,27 +332,32 @@ type taskFunc func()
 func (u *Up) uploadPartWrapper(chunk int, start, end, size int, buf []byte, bar *progressbar.ProgressBar) taskFunc {
 	return func() {
 		defer wg.Done()
-		resp, _ := u.client.R().SetHeaders(map[string]string{
-			"Content-Type":   "application/octet-stream",
-			"Content-Length": strconv.Itoa(size),
-		}).SetQueryParams(map[string]string{
-			"partNumber": strconv.Itoa(chunk + 1),
-			"uploadId":   u.upVideo.uploadId,
-			"chunk":      strconv.Itoa(chunk),
-			"chunks":     strconv.Itoa(int(u.chunks)),
-			"size":       strconv.Itoa(size),
-			"start":      strconv.Itoa(start),
-			"end":        strconv.Itoa(end),
-			"total":      strconv.FormatInt(u.upVideo.videoSize, 10),
-		}).SetBodyBytes(buf).SetRetryCount(5).AddRetryHook(func(resp *req.Response, err error) {
-			log.Println("重试发送分片", chunk)
-			return
-		}).
-			AddRetryCondition(func(resp *req.Response, err error) bool {
-				return err != nil || resp.StatusCode != 200
+		resp, _ := u.client.R().
+			SetHeaders(map[string]string{
+				"Content-Type":   "application/octet-stream",
+				"Content-Length": strconv.Itoa(size),
+			}).
+			SetQueryParams(map[string]string{
+				"partNumber": strconv.Itoa(chunk + 1),
+				"uploadId":   u.upVideo.uploadId,
+				"chunk":      strconv.Itoa(chunk),
+				"chunks":     strconv.Itoa(int(u.chunks)),
+				"size":       strconv.Itoa(size),
+				"start":      strconv.Itoa(start),
+				"end":        strconv.Itoa(end),
+				"total":      strconv.FormatInt(u.upVideo.videoSize, 10),
+			}).
+			SetBody(buf).
+			SetRetryCount(5).
+			AddRetryHooks(func(resp *resty.Response, err error) {
+				log.Println("重试发送分片", chunk)
+				return
+			}).
+			AddRetryConditions(func(resp *resty.Response, err error) bool {
+				return err != nil || resp.StatusCode() != 200
 			}).Put(u.upVideo.uploadBaseUrl)
 		bar.Add(len(buf) / 1024 / 1024)
-		if resp.StatusCode != 200 {
+		if resp.StatusCode() != 200 {
 			log.Println("分片", chunk, "上传失败", resp.StatusCode, "size", size)
 		}
 		u.partChan <- Part{

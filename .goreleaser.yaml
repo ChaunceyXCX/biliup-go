@@ -89,10 +89,10 @@ archives:
 
 nfpms:
     - license: AGPL 3.0
-      homepage: https://github.com/XiaoMiku01/biliup-go
+      homepage: https://github.com/ChaunceyXCX/biliup-go
       file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
       formats:
           - deb
           - rpm
-      maintainer: XiaoMiku01
+      maintainer: ChaunceyXCX
 

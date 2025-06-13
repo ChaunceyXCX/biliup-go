@@ -6,7 +6,7 @@ B 站命令行投稿工具 Golang 实现,支持 **扫码登录**, 并将登录�
 
 # 使用命令行  
 
-二进制文件 [下载](https://github.com/XiaoMiku01/biliup-go/releases)
+二进制文件 [下载](https://github.com/ChaunceyXCX/biliup-go/releases)
 
 ## 登录
 
@@ -30,15 +30,15 @@ eg:
 # 其他 go 程序使用
 
 ``` bash
-go get -u github.com/XiaoMiku01/biliup-go
+go get -u github.com/ChaunceyXCX/biliup-go
 ```
 
 ``` go
 package main
 
 import (
-	// "github.com/XiaoMiku01/biliup-go/login"
-	"github.com/XiaoMiku01/biliup-go/upload"
+	// "github.com/ChaunceyXCX/biliup-go/login"
+	"github.com/ChaunceyXCX/biliup-go/upload"
 )
 
 func main() {

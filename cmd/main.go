@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/XiaoMiku01/biliup-go/login"
-	"github.com/XiaoMiku01/biliup-go/upload"
-	"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/ChaunceyXCX/biliup-go/login"
+	"github.com/ChaunceyXCX/biliup-go/upload"
+	"github.com/alecthomas/kingpin/v2"
 )
 
 func main() {
