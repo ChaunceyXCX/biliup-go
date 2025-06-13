@@ -26,11 +26,8 @@ jobs:
               # 更新到最新稳定版本
               uses: goreleaser/goreleaser-action@v5
               with:
-                  # 修正参数名
                   distribution: latest
-                  # 修正参数名
                   command: release
                   args: --rm-dist
-                  version: latest
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
