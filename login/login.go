@@ -42,7 +42,7 @@ func getTvQrcodeUrlAndAuthCode() (string, string) {
 	}
 }
 
-func verifyLogin(authCode string) {
+func verifyLogin(authCode string, cookiePath string) {
 	api := "http://passport.bilibili.com/x/passport-tv-login/qrcode/poll"
 	data := make(map[string]string)
 	data["auth_code"] = authCode
@@ -62,12 +62,23 @@ func verifyLogin(authCode string) {
 		code := gjson.Parse(string(body)).Get("code").Int()
 		if code == 0 {
 			fmt.Println("登录成功")
-			filename := "cookie.json"
-			err := os.WriteFile(filename, []byte(string(body)), 0644)
+			if cookiePath == "" {
+				cookiePath = "cookie.json"
+			} else {
+				// 检查文件夹是否存在
+				if _, err := os.Stat(cookiePath); os.IsNotExist(err) {
+					// 创建文件夹
+					err := os.MkdirAll(cookiePath, 0755)
+					if err != nil {
+						panic(err)
+					}
+				}
+			}
+			err := os.WriteFile(cookiePath, []byte(string(body)), 0644)
 			if err != nil {
 				panic(err)
 			}
-			fmt.Println("cookie 已保存在", filename)
+			fmt.Println("cookie 已保存在", cookiePath)
 			break
 		} else {
 			time.Sleep(time.Second * 3)
@@ -105,12 +116,14 @@ func mapToString(params map[string]string) string {
 	return query
 }
 
-func LoginBili() {
-	fmt.Println("请最大化窗口，以确保二维码完整显示，回车继续")
-	fmt.Scanf("%s", "")
+func LoginBili(cookiePath string) (loginUrl string) {
+	//fmt.Println("请最大化窗口，以确保二维码完整显示，回车继续")
+	//fmt.Scanf("%s", "")
 	loginUrl, authCode := getTvQrcodeUrlAndAuthCode()
 	qrcode := qrcodeTerminal.New()
 	qrcode.Get([]byte(loginUrl)).Print()
+	fmt.Println("请在手机B站扫描二维码登录")
 	fmt.Println("或将此链接复制到手机B站打开:", loginUrl)
-	verifyLogin(authCode)
+	defer verifyLogin(authCode, cookiePath)
+	return loginUrl
 }

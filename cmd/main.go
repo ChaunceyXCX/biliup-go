@@ -8,6 +8,7 @@ import (
 
 func main() {
 	var loginCmd = kingpin.Command("login", "登录")
+	var loginCookie = loginCmd.Flag("c", "cookie文件路径").Default("cookie.json").String()
 	var uploadCmd = kingpin.Command("upload", "上传视频")
 	var cookie = uploadCmd.Flag("c", "cookie文件路径").Default("./cookie.json").String()
 	var videosPath = uploadCmd.Flag("v", "视频路径").Required().String()
@@ -22,7 +23,7 @@ func main() {
 	kingpin.Parse()
 	switch kingpin.Parse() {
 	case loginCmd.FullCommand():
-		login.LoginBili()
+		login.LoginBili(*loginCookie)
 	case uploadCmd.FullCommand():
 		upload.NewUp(*cookie, *threadNum).
 			SetVideos(*tid, *upType, *videosPath, *coverPath, *videoTitle, *videoDesc, *tag, *source).
