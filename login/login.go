@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -64,18 +65,6 @@ func verifyLogin(authCode string, cookiePath string) {
 		code := gjson.Parse(string(body)).Get("code").Int()
 		if code == 0 {
 			fmt.Println("登录成功")
-			if cookiePath == "" {
-				cookiePath = "cookie.json"
-			} else {
-				// 检查文件夹是否存在
-				if _, err := os.Stat(cookiePath); os.IsNotExist(err) {
-					// 创建文件夹
-					err := os.MkdirAll(cookiePath, 0755)
-					if err != nil {
-						panic(err)
-					}
-				}
-			}
 			err := os.WriteFile(cookiePath, []byte(string(body)), 0644)
 			if err != nil {
 				panic(err)
@@ -122,7 +111,7 @@ func checkOrMakeCookieFile(cookiePath string) error {
 	// 检查文件夹是否存在
 	if _, err := os.Stat(cookiePath); os.IsNotExist(err) {
 		// 创建文件夹
-		err := os.MkdirAll(path.Dir(cookiePath), 0755)
+		err := os.MkdirAll(filepath.Dir(cookiePath), 0755)
 		if err != nil {
 			return err
 		}
@@ -137,7 +126,10 @@ func checkOrMakeCookieFile(cookiePath string) error {
 
 func LoginBili(cookiePath string) (loginUrl string) {
 
-	checkOrMakeCookieFile(cookiePath)
+	err := checkOrMakeCookieFile(cookiePath)
+	if err != nil {
+		panic(err)
+	}
 
 	loginUrl, authCode := getTvQrcodeUrlAndAuthCode()
 
@@ -149,7 +141,7 @@ func LoginBili(cookiePath string) (loginUrl string) {
 	fmt.Println(qr.ToSmallString(false))
 	fmt.Println("或将此链接复制到手机B站打开:", loginUrl)
 	// 同步输出到文件
-	imagePath := path.Join(path.Dir(cookiePath), "qrcode.png")
+	imagePath := path.Join(filepath.Dir(cookiePath), "qrcode.png")
 	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
 		// 创建文件
 		_, err := os.Create(imagePath)
