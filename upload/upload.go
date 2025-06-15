@@ -143,28 +143,36 @@ func (u *Up) uploadCover(path string) string {
 	}
 	base64Encoding += base64.StdEncoding.EncodeToString(bytes)
 	var coverinfo CoverInfo
-	u.client.R().SetFormDataFromValues(url.Values{
-		"cover": {base64Encoding},
-		"csrf":  {u.csrf},
-	}).SetResult(&coverinfo).Post("https://member.bilibili.com/x/vu/web/cover/up")
+	u.client.R().
+		SetHeaders(map[string]string{"Cookie": u.cookie}).
+		SetFormDataFromValues(url.Values{
+			"cover": {base64Encoding},
+			"csrf":  {u.csrf},
+		}).SetResult(&coverinfo).Post("https://member.bilibili.com/x/vu/web/cover/up")
 	return coverinfo.Data.Url
 }
 
 func (u *Up) Up() {
 	var preupinfo PreUpInfo
-	u.client.R().SetQueryParams(map[string]string{
-		"probe_version": "20211012",
-		"upcdn":         "bda2",
-		"zone":          "cs",
-		"name":          u.upVideo.videoName,
-		"r":             "upos",
-		"profile":       "ugcfx/bup",
-		"ssl":           "0",
-		"version":       "2.10.4.0",
-		"build":         "2100400",
-		"size":          strconv.FormatInt(u.upVideo.videoSize, 10),
-		"webVersion":    "2.0.0",
-	}).SetResult(&preupinfo).Get("https://member.bilibili.com/preupload")
+	resp, err := u.client.R().
+		SetHeaders(map[string]string{"Cookie": u.cookie}).
+		SetQueryParams(map[string]string{
+			"probe_version": "20221109",
+			"upcdn":         "bda2",
+			"zone":          "cs",
+			"name":          u.upVideo.videoName,
+			"r":             "upos",
+			"profile":       "ugcfx/bup",
+			"ssl":           "0",
+			"version":       "2.14.0.0",
+			"build":         "2140000",
+			"size":          strconv.FormatInt(u.upVideo.videoSize, 10),
+			"webVersion":    "2.14.0",
+		}).
+		SetResult(&preupinfo).Get("https://member.bilibili.com/preupload")
+	if err != nil {
+		log.Println(err)
+	}
 	u.upVideo.uploadBaseUrl = fmt.Sprintf("https:%s/%s", preupinfo.Endpoint, strings.Split(preupinfo.UposUri, "//")[1])
 	u.upVideo.biliFileName = strings.Split(strings.Split(strings.Split(preupinfo.UposUri, "//")[1], "/")[1], ".")[0]
 	u.upVideo.chunkSize = preupinfo.ChunkSize
@@ -202,9 +210,11 @@ func (u *Up) Up() {
 		Csrf:          u.csrf,
 	}
 	_ = addreq
-	resp, _ := u.client.R().SetQueryParams(map[string]string{
-		"csrf": u.csrf,
-	}).SetBody(addreq).Post("https://member.bilibili.com/x/vu/web/add/v3")
+	resp, _ = u.client.R().
+		SetHeaders(map[string]string{"Cookie": u.cookie}).
+		SetQueryParams(map[string]string{
+			"csrf": u.csrf,
+		}).SetBody(addreq).Post("https://member.bilibili.com/x/vu/web/add/v3")
 	log.Println(resp.String())
 }
 
@@ -270,6 +280,7 @@ func (u *Up) upload() {
 			"Content-Type": "application/json",
 			"Origin":       "https://member.bilibili.com",
 			"Referer":      "https://member.bilibili.com/",
+			"Cookie":       u.cookie,
 		}).
 		SetQueryParams(map[string]string{
 			"output":   "json",
@@ -297,6 +308,7 @@ func (u *Up) uploadPart(chunk int, start, end, size int, buf []byte, bar *progre
 		SetHeaders(map[string]string{
 			"Content-Type":   "application/octet-stream",
 			"Content-Length": strconv.Itoa(size),
+			"Cookie":         u.cookie,
 		}).
 		SetQueryParams(map[string]string{
 			"partNumber": strconv.Itoa(chunk + 1),
@@ -336,6 +348,7 @@ func (u *Up) uploadPartWrapper(chunk int, start, end, size int, buf []byte, bar 
 			SetHeaders(map[string]string{
 				"Content-Type":   "application/octet-stream",
 				"Content-Length": strconv.Itoa(size),
+				"Cookie":         u.cookie,
 			}).
 			SetQueryParams(map[string]string{
 				"partNumber": strconv.Itoa(chunk + 1),
@@ -369,15 +382,17 @@ func (u *Up) uploadPartWrapper(chunk int, start, end, size int, buf []byte, bar 
 
 func (u *Up) getMetaUposUri() string {
 	var metaUposUri PreUpInfo
-	u.client.R().SetQueryParams(map[string]string{
-		"name":       "file_meta.txt",
-		"size":       "2000",
-		"r":          "upos",
-		"profile":    "fxmeta/bup",
-		"ssl":        "0",
-		"version":    "2.10.4",
-		"build":      "2100400",
-		"webVersion": "2.0.0",
-	}).SetResult(&metaUposUri).Get("https://member.bilibili.com/preupload")
+	u.client.R().
+		SetHeaders(map[string]string{"Cookie": u.cookie}).
+		SetQueryParams(map[string]string{
+			"name":       "file_meta.txt",
+			"size":       "2000",
+			"r":          "upos",
+			"profile":    "fxmeta/bup",
+			"ssl":        "0",
+			"version":    "2.10.4",
+			"build":      "2100400",
+			"webVersion": "2.0.0",
+		}).SetResult(&metaUposUri).Get("https://member.bilibili.com/preupload")
 	return metaUposUri.UposUri
 }
