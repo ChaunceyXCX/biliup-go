@@ -67,11 +67,13 @@ type Subtitle struct {
 	Lan  string `json:"lan"`
 }
 
-type CoverInfo struct {
+type GenericResponse struct {
 	Code    int64  `json:"code"`
 	Message string `json:"message"`
 	Ttl     int64  `json:"ttl"`
 	Data    struct {
-		Url string `json:"url"`
+		Url  string `json:"url"`
+		Aid  string `json:"aid"`
+		Bvid string `json:"bvid"`
 	} `json:"data"`
 }

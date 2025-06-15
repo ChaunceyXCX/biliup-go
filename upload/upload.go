@@ -142,7 +142,7 @@ func (u *Up) uploadCover(path string) string {
 		log.Fatal("不支持的图片格式")
 	}
 	base64Encoding += base64.StdEncoding.EncodeToString(bytes)
-	var coverinfo CoverInfo
+	var coverinfo GenericResponse
 	u.client.R().
 		SetHeaders(map[string]string{"Cookie": u.cookie}).
 		SetFormDataFromValues(url.Values{
@@ -152,7 +152,7 @@ func (u *Up) uploadCover(path string) string {
 	return coverinfo.Data.Url
 }
 
-func (u *Up) Up() {
+func (u *Up) Up() string {
 	var preupinfo PreUpInfo
 	resp, err := u.client.R().
 		SetHeaders(map[string]string{"Cookie": u.cookie}).
@@ -171,7 +171,7 @@ func (u *Up) Up() {
 		}).
 		SetResult(&preupinfo).Get("https://member.bilibili.com/preupload")
 	if err != nil {
-		log.Println(err)
+		panic(err)
 	}
 	u.upVideo.uploadBaseUrl = fmt.Sprintf("https:%s/%s", preupinfo.Endpoint, strings.Split(preupinfo.UposUri, "//")[1])
 	u.upVideo.biliFileName = strings.Split(strings.Split(strings.Split(preupinfo.UposUri, "//")[1], "/")[1], ".")[0]
@@ -209,13 +209,21 @@ func (u *Up) Up() {
 		LosslessMusic: 0,
 		Csrf:          u.csrf,
 	}
-	_ = addreq
-	resp, _ = u.client.R().
+	var addinfo GenericResponse
+	resp, err = u.client.R().
 		SetHeaders(map[string]string{"Cookie": u.cookie}).
 		SetQueryParams(map[string]string{
 			"csrf": u.csrf,
-		}).SetBody(addreq).Post("https://member.bilibili.com/x/vu/web/add/v3")
-	log.Println(resp.String())
+		}).SetResult(&addinfo).SetBody(addreq).Post("https://member.bilibili.com/x/vu/web/add/v3")
+	if err != nil {
+		panic(err)
+	}
+	if addinfo.Code != 0 {
+		log.Println("上传失败", addinfo.Message)
+	}
+	log.Println("\n" + resp.String())
+	return addinfo.Message
+
 }
 
 func (u *Up) upload() {
