@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"resty.dev/v3"
 	"strconv"
 	"strings"
@@ -102,7 +102,7 @@ func (u *Up) SetVideos(tid, upType int64, videoPath, coverPath, title, desc, tag
 	u.tid = tid
 	u.tag = tag
 	u.source = source
-	u.upVideo.videoName = path.Base(videoPath)
+	u.upVideo.videoName = filepath.Base(videoPath)
 	u.upVideo.videoSize = u.getVideoSize()
 	u.upVideo.coverUrl = u.uploadCover(coverPath)
 	return u
@@ -154,7 +154,7 @@ func (u *Up) uploadCover(path string) string {
 
 func (u *Up) Up() string {
 	var preupinfo PreUpInfo
-	resp, err := u.client.R().
+	_, err := u.client.R().
 		SetHeaders(map[string]string{"Cookie": u.cookie}).
 		SetQueryParams(map[string]string{
 			"probe_version": "20221109",
@@ -210,7 +210,7 @@ func (u *Up) Up() string {
 		Csrf:          u.csrf,
 	}
 	var addinfo GenericResponse
-	resp, err = u.client.R().
+	_, err = u.client.R().
 		SetHeaders(map[string]string{"Cookie": u.cookie}).
 		SetQueryParams(map[string]string{
 			"csrf": u.csrf,
@@ -221,7 +221,15 @@ func (u *Up) Up() string {
 	if addinfo.Code != 0 {
 		log.Println("上传失败", addinfo.Message)
 	}
-	log.Println("\n" + resp.String())
+
+	// 将 addinfo 转换为格式化后的 JSON 字符串
+	jsonData, err := json.Marshal(addinfo)
+	if err != nil {
+		log.Println("JSON 编码失败:", err)
+	} else {
+		log.Println(string(jsonData))
+	}
+
 	return addinfo.Message
 
 }

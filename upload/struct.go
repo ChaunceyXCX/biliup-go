@@ -73,7 +73,7 @@ type GenericResponse struct {
 	Ttl     int64  `json:"ttl"`
 	Data    struct {
 		Url  string `json:"url"`
-		Aid  string `json:"aid"`
+		Aid  int64  `json:"aid"`
 		Bvid string `json:"bvid"`
 	} `json:"data"`
 }
