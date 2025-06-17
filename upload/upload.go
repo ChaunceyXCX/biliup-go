@@ -102,7 +102,18 @@ func (u *Up) SetVideos(tid, upType int64, videoPath, coverPath, title, desc, tag
 	u.tid = tid
 	u.tag = tag
 	u.source = source
-	u.upVideo.videoName = filepath.Base(videoPath)
+
+	// 从路径中获取完整文件名
+	fullName := filepath.Base(videoPath)
+	// 从完整文件名中获取文件后缀
+	fileExt := filepath.Ext(fullName)
+	// 从完整文件名中去除后缀，得到文件名
+	videoName := strings.TrimSuffix(fullName, fileExt)
+
+	if len(videoName) > 80 {
+		videoName = videoName[:80]
+	}
+	u.upVideo.videoName = videoName + fileExt
 	u.upVideo.videoSize = u.getVideoSize()
 	u.upVideo.coverUrl = u.uploadCover(coverPath)
 	return u
