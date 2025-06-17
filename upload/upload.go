@@ -110,8 +110,8 @@ func (u *Up) SetVideos(tid, upType int64, videoPath, coverPath, title, desc, tag
 	// 从完整文件名中去除后缀，得到文件名
 	videoName := strings.TrimSuffix(fullName, fileExt)
 
-	if len(videoName) > 80 {
-		videoName = videoName[:80]
+	if len(videoName) > 60 {
+		videoName = videoName[:60]
 	}
 	u.upVideo.videoName = videoName + fileExt
 	u.upVideo.videoSize = u.getVideoSize()
